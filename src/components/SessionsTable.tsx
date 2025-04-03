@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React from "react";
 
 type Session = {
   id: string;
@@ -7,7 +6,7 @@ type Session = {
   client: string;
   sessionType: string;
   dateTime: string;
-  status: 'In Progress' | 'Scheduled' | 'Confirmed' | 'Completed' | 'Cancelled';
+  status: "In Progress" | "Scheduled" | "Confirmed" | "Completed" | "Cancelled";
 };
 
 type SessionsTableProps = {
@@ -16,18 +15,38 @@ type SessionsTableProps = {
 };
 
 const SessionsTable: React.FC<SessionsTableProps> = ({ sessions, title }) => {
-  const getStatusBadge = (status: Session['status']) => {
+  const getStatusBadge = (status: Session["status"]) => {
     switch (status) {
-      case 'In Progress':
-        return <span className="px-3 py-1 text-xs rounded-full bg-green-100 text-green-800">In Progress</span>;
-      case 'Scheduled':
-        return <span className="px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-800">Scheduled</span>;
-      case 'Confirmed':
-        return <span className="px-3 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Confirmed</span>;
-      case 'Completed':
-        return <span className="px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-800">Completed</span>;
-      case 'Cancelled':
-        return <span className="px-3 py-1 text-xs rounded-full bg-red-100 text-red-800">Cancelled</span>;
+      case "In Progress":
+        return (
+          <span className="px-3 py-1 text-xs rounded-full bg-green-100 text-green-800">
+            In Progress
+          </span>
+        );
+      case "Scheduled":
+        return (
+          <span className="px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+            Scheduled
+          </span>
+        );
+      case "Confirmed":
+        return (
+          <span className="px-3 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">
+            Confirmed
+          </span>
+        );
+      case "Completed":
+        return (
+          <span className="px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+            Completed
+          </span>
+        );
+      case "Cancelled":
+        return (
+          <span className="px-3 py-1 text-xs rounded-full bg-red-100 text-red-800">
+            Cancelled
+          </span>
+        );
       default:
         return null;
     }
@@ -51,7 +70,10 @@ const SessionsTable: React.FC<SessionsTableProps> = ({ sessions, title }) => {
           </thead>
           <tbody>
             {sessions.map((session) => (
-              <tr key={session.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
+              <tr
+                key={session.id}
+                className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50"
+              >
                 <td className="px-6 py-4">{session.trainer}</td>
                 <td className="px-6 py-4">{session.client}</td>
                 <td className="px-6 py-4">{session.sessionType}</td>

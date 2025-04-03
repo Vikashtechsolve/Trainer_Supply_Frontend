@@ -1,6 +1,5 @@
-
-import React from 'react';
-
+import React from "react";
+import ActionCard from "../components/ActionCard";
 const Clients: React.FC = () => {
   return (
     <div className="p-6">
