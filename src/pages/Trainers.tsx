@@ -15,7 +15,9 @@ const Trainers: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState("name"); // Default filter type
+  const [filterType, setFilterType] = useState("name");
+  const [sortField, setSortField] = useState<string>("");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   const filterOptions = [
     "name",
@@ -31,6 +33,11 @@ const Trainers: React.FC = () => {
     "remarks",
   ];
 
+  const sortOptions = [
+    { label: "None", value: "" },
+    { label: "Passing Year", value: "passingYear" },
+    { label: "Total Experience", value: "totalExperience" },
+  ];
   //trainers Data
 
   const [trainers, setTrainers] = useState([
@@ -41,7 +48,8 @@ const Trainers: React.FC = () => {
       qualification: "M.E. (Computer Engineering)",
       passingYear: "2002",
       expertise: "DSA Trainer",
-      resume: null as File | null,
+      resume:
+        "https://drive.google.com/file/d/1nwkpN72Nx7w29snOChBqos_c6eYj6cab/view?usp=sharing",
       teachingExperience: "22yrs",
       developmentExperience: "3 yrs",
       totalExperience: "22 yrs",
@@ -74,6 +82,21 @@ const Trainers: React.FC = () => {
       typeof value === "string" &&
       value.toLowerCase().includes(searchTerm.toLowerCase())
     );
+  });
+
+  const sortedTrainers = [...filteredTrainers].sort((a, b) => {
+    if (!sortField) return 0; // No sorting applied
+
+    const valA = a[sortField as keyof typeof a];
+    const valB = b[sortField as keyof typeof b];
+
+    // Convert string-based numeric values to actual numbers
+    const numA = typeof valA === "string" ? parseInt(valA) : valA;
+    const numB = typeof valB === "string" ? parseInt(valB) : valB;
+
+    if (numA < numB) return sortOrder === "asc" ? -1 : 1;
+    if (numA > numB) return sortOrder === "asc" ? 1 : -1;
+    return 0;
   });
 
   const handleFormSubmit = async (formData: TrainerFormData) => {
@@ -197,12 +220,28 @@ const Trainers: React.FC = () => {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="border p-2 rounded-md w-full max-w-md"
         />
+
+        {/* Sorting Dropdown (Added Sorting UI) */}
+        <select
+          value={sortField}
+          onChange={(e) => setSortField(e.target.value)}
+          className="border p-2 rounded-md"
+        >
+          <option value="">Sort by</option>
+          <option value="totalExperience">Total Experience</option>
+          <option value="passingYear">Passing Year</option>
+        </select>
+
+        {/* Ascending/Descending Toggle */}
+        <button
+          onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+          className="border p-2 rounded-md"
+        >
+          {sortOrder === "asc" ? "⬆ Asc" : "⬇ Desc"}
+        </button>
       </div>
 
-      <TrainerTable
-        Trainers={searchTerm ? filteredTrainers : trainers}
-        title="Trainer List"
-      />
+      <TrainerTable Trainers={sortedTrainers} title="Trainer List" />
 
       <TrainerForm
         isOpen={isFormOpen}

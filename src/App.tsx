@@ -1,10 +1,9 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-
+import Trash from "./pages/Trash";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Trainers from "./pages/Trainers";
@@ -28,6 +27,7 @@ const App = () => (
             <Route index element={<Dashboard />} />
             <Route path="trainers" element={<Trainers />} />
             <Route path="clients" element={<Clients />} />
+            <Route path="trash" element={<Trash />} />
             <Route path="schedule" element={<Schedule />} />
             <Route path="payments" element={<Payments />} />
             <Route path="reports" element={<Reports />} />

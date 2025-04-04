@@ -8,6 +8,7 @@ import {
   CreditCard,
   BarChart2,
   Settings,
+  Trash2,
 } from "lucide-react";
 
 type NavItemProps = {
@@ -67,6 +68,12 @@ const Sidebar: React.FC = () => {
           label="Schedule"
           href="/schedule"
           active={currentPath === "/schedule"}
+        />
+        <NavItem
+          icon={Trash2}
+          label="Trash"
+          href="/trash"
+          active={currentPath === "/trash"}
         />
         <NavItem
           icon={CreditCard}
