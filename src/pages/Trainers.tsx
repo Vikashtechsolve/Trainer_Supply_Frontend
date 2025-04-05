@@ -5,6 +5,7 @@ import TrainerForm, { TrainerFormData } from "../components/TrainerForm";
 import axios from "axios";
 import TrainerTable from "../components/TrainerTable";
 import { useNavigate } from "react-router-dom";
+import Pagination from "../components/Pagination";
 
 interface APIErrorResponse {
   errors: { msg: string }[];
@@ -30,6 +31,15 @@ type Trainer = {
   id?: string | number;
 };
 
+// Simple UUID generator function
+const generateUUID = (): string => {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 const Trainers: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,6 +55,11 @@ const Trainers: React.FC = () => {
     TrainerFormData | undefined
   >(undefined);
   const navigate = useNavigate();
+
+  // Add paginated trainers state
+  const [paginatedTrainers, setPaginatedTrainers] = useState<Trainer[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const filterOptions = [
     "name",
@@ -103,34 +118,63 @@ const Trainers: React.FC = () => {
     },
   ]);
 
-  // Load trainers from localStorage on initial render
+  // Effect to load trainers from localStorage on component mount
   useEffect(() => {
-    const activeTrainers = localStorage.getItem("activeTrainers");
-    if (activeTrainers) {
-      setTrainers(JSON.parse(activeTrainers));
-    } else {
-      // Initialize localStorage with current trainers if not already set
-      localStorage.setItem("activeTrainers", JSON.stringify(trainers));
+    const storedTrainers = localStorage.getItem("trainers");
+    if (storedTrainers) {
+      try {
+        setTrainers(JSON.parse(storedTrainers));
+      } catch (error) {
+        console.error("Failed to parse trainers from localStorage:", error);
+      }
     }
-  }, []);
+  }, []); // Empty dependency array is correct here as we only want to load on mount
 
-  // Update localStorage whenever trainers change
+  // Effect to load simplifiedView preference from localStorage
   useEffect(() => {
-    localStorage.setItem("activeTrainers", JSON.stringify(trainers));
-  }, [trainers]);
-
-  // Load simplifiedView preference from localStorage
-  useEffect(() => {
-    const savedSimplifiedView = localStorage.getItem("simplifiedTableView");
+    const savedSimplifiedView = localStorage.getItem("simplifiedView");
     if (savedSimplifiedView) {
-      setSimplifiedView(savedSimplifiedView === "true");
+      try {
+        setSimplifiedView(JSON.parse(savedSimplifiedView));
+      } catch (error) {
+        console.error(
+          "Failed to parse simplifiedView from localStorage:",
+          error
+        );
+      }
     }
   }, []);
 
-  // Save simplifiedView preference to localStorage when it changes
+  // Effect to save trainers to localStorage whenever trainers state changes
   useEffect(() => {
-    localStorage.setItem("simplifiedTableView", simplifiedView.toString());
-  }, [simplifiedView]);
+    // Ensure all trainers have IDs before storing
+    const trainersWithIds = trainers.map((trainer) => {
+      if (!trainer.id) {
+        return { ...trainer, id: generateUUID() };
+      }
+      return trainer;
+    });
+
+    // Only update if there are changes
+    if (JSON.stringify(trainers) !== JSON.stringify(trainersWithIds)) {
+      setTrainers(trainersWithIds);
+    } else {
+      localStorage.setItem("trainers", JSON.stringify(trainers));
+    }
+  }, [trainers]); // Add trainers to dependency array
+
+  // Effect to save simplifiedView preference to localStorage
+  useEffect(() => {
+    localStorage.setItem("simplifiedView", JSON.stringify(simplifiedView));
+  }, [simplifiedView]); // Add simplifiedView to dependency array
+
+  // Load pagination preferences
+  useEffect(() => {
+    const savedItemsPerPage = localStorage.getItem("trainersPageItemsPerPage");
+    if (savedItemsPerPage) {
+      setItemsPerPage(Number(savedItemsPerPage));
+    }
+  }, []);
 
   const filteredTrainers = trainers.filter((trainer) => {
     const value = trainer[filterType as keyof typeof trainer]; // Access selected field
@@ -154,6 +198,44 @@ const Trainers: React.FC = () => {
     if (numA > numB) return sortOrder === "asc" ? 1 : -1;
     return 0;
   });
+
+  // Apply pagination after filtering and sorting
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setPaginatedTrainers(sortedTrainers.slice(startIndex, endIndex));
+
+    // If current page is now invalid, reset to page 1
+    if (
+      currentPage > Math.ceil(sortedTrainers.length / itemsPerPage) &&
+      sortedTrainers.length > 0
+    ) {
+      setCurrentPage(1);
+    }
+  }, [sortedTrainers, currentPage, itemsPerPage]);
+
+  // Get total pages
+  const totalPages = Math.max(
+    1,
+    Math.ceil(sortedTrainers.length / itemsPerPage)
+  );
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  // Handle items per page change
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+
+    // Save preference to localStorage
+    localStorage.setItem(
+      "trainersPageItemsPerPage",
+      newItemsPerPage.toString()
+    );
+  };
 
   // Handle edit trainer action
   const handleEditTrainer = (trainer: Trainer) => {
@@ -205,12 +287,8 @@ const Trainers: React.FC = () => {
         // Update the trainer in the local state
         setTrainers((prevTrainers) =>
           prevTrainers.map((t) => {
-            // Find the trainer being edited by ID if available, otherwise by name
-            const matchesTrainer = editingTrainer.id
-              ? t.id === editingTrainer.id
-              : t.name === editingTrainer.name;
-
-            if (matchesTrainer) {
+            // Always use ID for matching
+            if (t.id === editingTrainer.id) {
               // Convert form data back to Trainer format
               return {
                 ...t,
@@ -228,7 +306,6 @@ const Trainers: React.FC = () => {
                 payoutExpectation: formData.payoutExpectation,
                 location: formData.location,
                 remarks: formData.remarks,
-                id: formData.id,
               };
             }
             return t;
@@ -236,46 +313,28 @@ const Trainers: React.FC = () => {
         );
         setSuccess("Trainer updated successfully!");
       } else {
-        // Create FormData object for file upload (for new trainers)
-        const submitData = new FormData();
-        Object.keys(formData).forEach((key) => {
-          const value = formData[key as keyof TrainerFormData];
-          if (key === "resume" && value instanceof File) {
-            submitData.append("resume", value);
-          } else if (typeof value === "string") {
-            submitData.append(key, value);
-          } else {
-            console.warn(`Skipping key ${key} due to unexpected type:`, value);
-          }
-        });
-
-        // Log the FormData contents
-        for (const pair of submitData.entries()) {
-          console.log(pair[0] + ": " + pair[1]);
+        // Handle resume for new trainer
+        let resumeToStore = formData.resume;
+        if (formData.resume instanceof File) {
+          // In a real app with backend, you'd upload the file here
+          // For now, we'll just store a placeholder URL
+          resumeToStore = `resume-placeholder-${formData.name.replace(
+            /\s+/g,
+            "-"
+          )}.pdf`;
+          console.log("Would upload file:", formData.resume.name);
         }
 
-        // Here you would normally make an API call
-        /* Uncomment when backend is ready
-        const response = await axios.post(
-          "http://localhost:5000/api/trainers",
-          submitData,
-          {
-            headers: {
-              "Content-Type": "multipart/form-data",
-            },
-          }
-        );
-        */
-
-        // For now, just add to the local state
+        // Create new trainer with guaranteed ID
         const newTrainer: Trainer = {
+          id: generateUUID(), // Always generate a new ID
           name: formData.name,
           email: formData.email,
           phoneNo: formData.phoneNo,
           qualification: formData.qualification,
           passingYear: formData.passingYear,
           expertise: formData.expertise,
-          resume: formData.resume,
+          resume: resumeToStore,
           teachingExperience: formData.teachingExperience,
           developmentExperience: formData.developmentExperience,
           totalExperience: formData.totalExperience,
@@ -284,6 +343,7 @@ const Trainers: React.FC = () => {
           location: formData.location,
           remarks: formData.remarks,
         };
+
         setTrainers((prevTrainers) => [...prevTrainers, newTrainer]);
         setSuccess("Trainer added successfully!");
       }
@@ -340,8 +400,8 @@ const Trainers: React.FC = () => {
 
   // Handle trashing a trainer
   const handleTrashTrainer = (trainer: Trainer) => {
-    // Remove from trainers list
-    setTrainers(trainers.filter((t) => t.name !== trainer.name));
+    // Remove from trainers list using ID for reliable identification
+    setTrainers(trainers.filter((t) => t.id !== trainer.id));
 
     // Add to localStorage for trash
     const trashedTrainers = JSON.parse(
@@ -467,12 +527,29 @@ const Trainers: React.FC = () => {
       </div>
 
       <TrainerTable
-        Trainers={sortedTrainers}
-        title="Trainer List"
+        Trainers={paginatedTrainers}
+        title={`Trainer List (${sortedTrainers.length} total${
+          searchTerm ? ", filtered" : ""
+        })`}
         onTrashTrainer={handleTrashTrainer}
         onEditTrainer={handleEditTrainer}
         simplifiedView={simplifiedView}
+        enablePagination={false}
       />
+
+      {/* Add pagination component */}
+      {sortedTrainers.length > 0 && (
+        <div className="mt-4">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            itemsPerPage={itemsPerPage}
+            onItemsPerPageChange={handleItemsPerPageChange}
+            totalItems={sortedTrainers.length}
+          />
+        </div>
+      )}
 
       <TrainerForm
         isOpen={isFormOpen}

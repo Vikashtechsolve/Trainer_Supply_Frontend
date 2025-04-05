@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import Pagination from "../components/Pagination";
 
 interface DeletedTrainer {
   name: string;
@@ -97,6 +98,22 @@ const Trash: React.FC = () => {
     trainer: null,
     action: "",
   });
+
+  // Pagination states
+  const [trainerCurrentPage, setTrainerCurrentPage] = useState(1);
+  const [trainerItemsPerPage, setTrainerItemsPerPage] = useState(10);
+  const [paginatedTrainers, setPaginatedTrainers] = useState<DeletedTrainer[]>(
+    []
+  );
+
+  const [clientCurrentPage, setClientCurrentPage] = useState(1);
+  const [clientItemsPerPage, setClientItemsPerPage] = useState(10);
+  const [paginatedClients, setPaginatedClients] = useState<DeletedClient[]>([]);
+
+  const [courseCurrentPage, setCourseCurrentPage] = useState(1);
+  const [courseItemsPerPage, setCourseItemsPerPage] = useState(10);
+  const [paginatedCourses, setPaginatedCourses] = useState<DeletedCourse[]>([]);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -106,6 +123,77 @@ const Trash: React.FC = () => {
     );
     setDeletedTrainers(trashedTrainers);
   }, []);
+
+  // Load saved pagination preferences
+  useEffect(() => {
+    // Load trainer items per page
+    const savedTrainerItemsPerPage = localStorage.getItem(
+      "trashTrainerItemsPerPage"
+    );
+    if (savedTrainerItemsPerPage) {
+      setTrainerItemsPerPage(Number(savedTrainerItemsPerPage));
+    }
+
+    // Load client items per page
+    const savedClientItemsPerPage = localStorage.getItem(
+      "trashClientItemsPerPage"
+    );
+    if (savedClientItemsPerPage) {
+      setClientItemsPerPage(Number(savedClientItemsPerPage));
+    }
+
+    // Load course items per page
+    const savedCourseItemsPerPage = localStorage.getItem(
+      "trashCourseItemsPerPage"
+    );
+    if (savedCourseItemsPerPage) {
+      setCourseItemsPerPage(Number(savedCourseItemsPerPage));
+    }
+  }, []);
+
+  // Calculate pagination for trainers
+  useEffect(() => {
+    const startIndex = (trainerCurrentPage - 1) * trainerItemsPerPage;
+    const endIndex = startIndex + trainerItemsPerPage;
+    setPaginatedTrainers(deletedTrainers.slice(startIndex, endIndex));
+
+    // Reset to page 1 if current page is invalid
+    if (
+      trainerCurrentPage >
+        Math.ceil(deletedTrainers.length / trainerItemsPerPage) &&
+      deletedTrainers.length > 0
+    ) {
+      setTrainerCurrentPage(1);
+    }
+  }, [deletedTrainers, trainerCurrentPage, trainerItemsPerPage]);
+
+  // Calculate pagination for clients
+  useEffect(() => {
+    const startIndex = (clientCurrentPage - 1) * clientItemsPerPage;
+    const endIndex = startIndex + clientItemsPerPage;
+    setPaginatedClients(deletedClients.slice(startIndex, endIndex));
+  }, [deletedClients, clientCurrentPage, clientItemsPerPage]);
+
+  // Calculate pagination for courses
+  useEffect(() => {
+    const startIndex = (courseCurrentPage - 1) * courseItemsPerPage;
+    const endIndex = startIndex + courseItemsPerPage;
+    setPaginatedCourses(deletedCourses.slice(startIndex, endIndex));
+  }, [deletedCourses, courseCurrentPage, courseItemsPerPage]);
+
+  // Get total pages
+  const trainerTotalPages = Math.max(
+    1,
+    Math.ceil(deletedTrainers.length / trainerItemsPerPage)
+  );
+  const clientTotalPages = Math.max(
+    1,
+    Math.ceil(deletedClients.length / clientItemsPerPage)
+  );
+  const courseTotalPages = Math.max(
+    1,
+    Math.ceil(deletedCourses.length / courseItemsPerPage)
+  );
 
   const toggleSection = (section: string) => {
     setActiveSection(activeSection === section ? null : section);
@@ -124,10 +212,11 @@ const Trash: React.FC = () => {
 
     const trainer = confirmationModal.trainer;
 
-    // Remove from trashed trainers
+    // Remove from trashed trainers using ID for reliable identification
     const updatedTrashedTrainers = deletedTrainers.filter(
-      (t) => t.name !== trainer.name
+      (t) => t.id !== trainer.id
     );
+
     setDeletedTrainers(updatedTrashedTrainers);
     localStorage.setItem(
       "trashedTrainers",
@@ -136,13 +225,19 @@ const Trash: React.FC = () => {
 
     // Get current trainers from localStorage or initialize empty array
     const currentTrainers = JSON.parse(
-      localStorage.getItem("activeTrainers") || "[]"
+      localStorage.getItem("trainers") || "[]"
     );
 
     // Add the trainer back to active trainers (without the trashedAt property)
     const { trashedAt, ...trainerData } = trainer;
+
+    // Ensure the trainer has an ID
+    if (!trainerData.id) {
+      trainerData.id = "restored-" + new Date().getTime();
+    }
+
     currentTrainers.push(trainerData);
-    localStorage.setItem("activeTrainers", JSON.stringify(currentTrainers));
+    localStorage.setItem("trainers", JSON.stringify(currentTrainers));
 
     // Show success message
     setSuccess(`Trainer "${trainer.name}" has been restored.`);
@@ -151,6 +246,25 @@ const Trash: React.FC = () => {
     setTimeout(() => {
       setSuccess(null);
     }, 3000);
+  };
+
+  // Add handlers for items per page changes
+  const handleTrainerItemsPerPageChange = (newValue: number) => {
+    setTrainerItemsPerPage(newValue);
+    setTrainerCurrentPage(1);
+    localStorage.setItem("trashTrainerItemsPerPage", newValue.toString());
+  };
+
+  const handleClientItemsPerPageChange = (newValue: number) => {
+    setClientItemsPerPage(newValue);
+    setClientCurrentPage(1);
+    localStorage.setItem("trashClientItemsPerPage", newValue.toString());
+  };
+
+  const handleCourseItemsPerPageChange = (newValue: number) => {
+    setCourseItemsPerPage(newValue);
+    setCourseCurrentPage(1);
+    localStorage.setItem("trashCourseItemsPerPage", newValue.toString());
   };
 
   return (
@@ -191,7 +305,7 @@ const Trash: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {deletedTrainers.length === 0 ? (
+                  {paginatedTrainers.length === 0 ? (
                     <tr>
                       <td
                         colSpan={5}
@@ -201,7 +315,7 @@ const Trash: React.FC = () => {
                       </td>
                     </tr>
                   ) : (
-                    deletedTrainers.map((trainer, index) => (
+                    paginatedTrainers.map((trainer, index) => (
                       <tr key={index}>
                         <td className="px-6 py-4">{trainer.name}</td>
                         <td className="px-6 py-4">{trainer.email}</td>
@@ -223,6 +337,18 @@ const Trash: React.FC = () => {
                 </tbody>
               </table>
             </div>
+
+            {/* Add pagination for trainers */}
+            {deletedTrainers.length > 0 && (
+              <Pagination
+                currentPage={trainerCurrentPage}
+                totalPages={trainerTotalPages}
+                onPageChange={setTrainerCurrentPage}
+                itemsPerPage={trainerItemsPerPage}
+                onItemsPerPageChange={handleTrainerItemsPerPageChange}
+                totalItems={deletedTrainers.length}
+              />
+            )}
           </div>
         )}
 
@@ -246,20 +372,43 @@ const Trash: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {deletedClients.map((client, index) => (
-                    <tr key={index}>
-                      <td className="px-6 py-4">{client.name}</td>
-                      <td className="px-6 py-4">{client.email}</td>
-                      <td className="px-6 py-4">
-                        <button className="text-blue-500 hover:text-blue-700">
-                          Restore
-                        </button>
+                  {paginatedClients.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="px-6 py-4 text-center text-gray-500"
+                      >
+                        No clients in trash
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    paginatedClients.map((client, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4">{client.name}</td>
+                        <td className="px-6 py-4">{client.email}</td>
+                        <td className="px-6 py-4">
+                          <button className="text-blue-500 hover:text-blue-700">
+                            Restore
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* Add pagination for clients */}
+            {deletedClients.length > 0 && (
+              <Pagination
+                currentPage={clientCurrentPage}
+                totalPages={clientTotalPages}
+                onPageChange={setClientCurrentPage}
+                itemsPerPage={clientItemsPerPage}
+                onItemsPerPageChange={handleClientItemsPerPageChange}
+                totalItems={deletedClients.length}
+              />
+            )}
           </div>
         )}
 
@@ -283,20 +432,43 @@ const Trash: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {deletedCourses.map((course, index) => (
-                    <tr key={index}>
-                      <td className="px-6 py-4">{course.name}</td>
-                      <td className="px-6 py-4">{course.description}</td>
-                      <td className="px-6 py-4">
-                        <button className="text-blue-500 hover:text-blue-700">
-                          Restore
-                        </button>
+                  {paginatedCourses.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="px-6 py-4 text-center text-gray-500"
+                      >
+                        No courses in trash
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    paginatedCourses.map((course, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4">{course.name}</td>
+                        <td className="px-6 py-4">{course.description}</td>
+                        <td className="px-6 py-4">
+                          <button className="text-blue-500 hover:text-blue-700">
+                            Restore
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* Add pagination for courses */}
+            {deletedCourses.length > 0 && (
+              <Pagination
+                currentPage={courseCurrentPage}
+                totalPages={courseTotalPages}
+                onPageChange={setCourseCurrentPage}
+                itemsPerPage={courseItemsPerPage}
+                onItemsPerPageChange={handleCourseItemsPerPageChange}
+                totalItems={deletedCourses.length}
+              />
+            )}
           </div>
         )}
       </div>
