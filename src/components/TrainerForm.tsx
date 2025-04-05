@@ -16,6 +16,7 @@ export interface TrainerFormData {
   payoutExpectation: string;
   location: string;
   remarks: string;
+  status?: "Selected" | "Rejected" | "Pending"; // Add status field
   id?: string | number; // Add id for editing existing trainers
 }
 
@@ -55,6 +56,7 @@ const TrainerForm: React.FC<TrainerFormProps> = ({
     payoutExpectation: "",
     location: "",
     remarks: "",
+    status: "Pending",
   });
 
   // Store a flag to track if a new file was uploaded
@@ -199,6 +201,14 @@ const TrainerForm: React.FC<TrainerFormProps> = ({
     setErrors((prev) => ({ ...prev, [name]: error }));
   };
 
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -223,6 +233,7 @@ const TrainerForm: React.FC<TrainerFormProps> = ({
           ? formData.resume
           : initialData?.resume || null,
       id: isEditing && initialData?.id ? initialData.id : undefined,
+      status: formData.status || "Pending",
     };
 
     onSubmit(dataToSubmit);
@@ -502,18 +513,55 @@ const TrainerForm: React.FC<TrainerFormProps> = ({
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Remarks
-            </label>
-            <textarea
-              name="remarks"
-              value={formData.remarks}
-              onChange={handleChange}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              disabled={isSubmitting}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label
+                htmlFor="remarks"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Remarks (Optional)
+              </label>
+              <textarea
+                id="remarks"
+                name="remarks"
+                value={formData.remarks}
+                onChange={handleChange}
+                rows={3}
+                className={`w-full px-3 py-2 border rounded-md ${
+                  errors.remarks && touched.remarks
+                    ? "border-red-500"
+                    : "border-gray-300"
+                }`}
+                placeholder="Any additional notes..."
+              ></textarea>
+              {errors.remarks && touched.remarks && (
+                <p className="mt-1 text-sm text-red-500">{errors.remarks}</p>
+              )}
+            </div>
+            <div>
+              <label
+                htmlFor="status"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Status
+              </label>
+              <select
+                id="status"
+                name="status"
+                value={formData.status || "Pending"}
+                onChange={handleSelectChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="Pending">Pending</option>
+                <option value="Selected">Selected</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+              {!isEditing && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Default status for new trainers is "Pending"
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end space-x-4 mt-6">

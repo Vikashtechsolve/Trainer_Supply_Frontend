@@ -1,6 +1,8 @@
 import React from "react";
 import { useState, useEffect } from "react";
 import Pagination from "./Pagination";
+import { MoreVertical } from "lucide-react";
+import StatusBadge from "./StatusBadge";
 
 type Trainers = {
   name: string;
@@ -19,6 +21,7 @@ type Trainers = {
   remarks: string;
   interview?: "Taken" | "Not taken";
   id?: string | number;
+  status?: "Selected" | "Rejected" | "Pending";
 };
 
 interface TrainerTableProps {
@@ -336,6 +339,12 @@ const TrainersTable: React.FC<TrainerTableProps> = ({
               {!simplifiedView && (
                 <th className="px-6 py-3 font-medium">Remarks</th>
               )}
+              <th className="px-6 py-3 font-medium relative group">
+                Status
+                <span className="hidden group-hover:block absolute top-full left-0 bg-gray-800 text-white text-xs px-2 py-1 rounded z-10 whitespace-nowrap">
+                  Click on a status badge to cycle between options
+                </span>
+              </th>
               {!simplifiedView && (
                 <th className="px-6 py-3 font-medium">Interview</th>
               )}
@@ -391,6 +400,21 @@ const TrainersTable: React.FC<TrainerTableProps> = ({
                   {!simplifiedView && (
                     <td className="px-6 py-4">{trainer.remarks}</td>
                   )}
+                  <td className="px-6 py-4">
+                    <StatusBadge
+                      status={trainer.status || "Pending"}
+                      clickable={true}
+                      onClick={(newStatus) => {
+                        const updatedTrainer = {
+                          ...trainer,
+                          status: newStatus,
+                        };
+                        if (onEditTrainer) {
+                          onEditTrainer(updatedTrainer);
+                        }
+                      }}
+                    />
+                  </td>
                   {!simplifiedView && (
                     <td className="px-6 py-4">
                       {trainer.interview ? (

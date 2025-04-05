@@ -6,6 +6,7 @@ import axios from "axios";
 import TrainerTable from "../components/TrainerTable";
 import { useNavigate } from "react-router-dom";
 import Pagination from "../components/Pagination";
+import StatusBadge from "../components/StatusBadge";
 
 interface APIErrorResponse {
   errors: { msg: string }[];
@@ -28,6 +29,7 @@ type Trainer = {
   location: string;
   remarks: string;
   interview?: "Taken" | "Not taken";
+  status: "Selected" | "Rejected" | "Pending";
   id?: string | number;
 };
 
@@ -73,12 +75,14 @@ const Trainers: React.FC = () => {
     "payoutExpectation",
     "feasibleTime",
     "remarks",
+    "status",
   ];
 
   const sortOptions = [
     { label: "None", value: "" },
     { label: "Passing Year", value: "passingYear" },
     { label: "Total Experience", value: "totalExperience" },
+    { label: "Status", value: "status" },
   ];
   //trainers Data
 
@@ -99,6 +103,7 @@ const Trainers: React.FC = () => {
       payoutExpectation: "Depends on the project",
       location: "",
       remarks: "",
+      status: "Pending",
     },
     {
       name: "Prabhat Chandra",
@@ -115,6 +120,7 @@ const Trainers: React.FC = () => {
       payoutExpectation: "",
       location: "",
       remarks: "",
+      status: "Pending",
     },
   ]);
 
@@ -145,28 +151,33 @@ const Trainers: React.FC = () => {
     }
   }, []);
 
-  // Effect to save trainers to localStorage whenever trainers state changes
-  useEffect(() => {
-    // Ensure all trainers have IDs before storing
-    const trainersWithIds = trainers.map((trainer) => {
-      if (!trainer.id) {
-        return { ...trainer, id: generateUUID() };
-      }
-      return trainer;
-    });
+  // Create a dedicated function to save trainers to localStorage
+  const saveTrainersToLocalStorage = (trainersToSave: Trainer[]) => {
+    try {
+      // Ensure all trainers have IDs before storing
+      const trainersWithIds = trainersToSave.map((trainer) => {
+        if (!trainer.id) {
+          return { ...trainer, id: generateUUID() };
+        }
+        return trainer;
+      });
 
-    // Only update if there are changes
-    if (JSON.stringify(trainers) !== JSON.stringify(trainersWithIds)) {
-      setTrainers(trainersWithIds);
-    } else {
-      localStorage.setItem("trainers", JSON.stringify(trainers));
+      // Save to localStorage
+      localStorage.setItem("trainers", JSON.stringify(trainersWithIds));
+
+      // If we added IDs, update state (but avoid infinite loops)
+      if (JSON.stringify(trainersToSave) !== JSON.stringify(trainersWithIds)) {
+        setTrainers(trainersWithIds);
+      }
+    } catch (error) {
+      console.error("Failed to save trainers to localStorage:", error);
     }
-  }, [trainers]); // Add trainers to dependency array
+  };
 
   // Effect to save simplifiedView preference to localStorage
   useEffect(() => {
     localStorage.setItem("simplifiedView", JSON.stringify(simplifiedView));
-  }, [simplifiedView]); // Add simplifiedView to dependency array
+  }, [simplifiedView]);
 
   // Load pagination preferences
   useEffect(() => {
@@ -237,36 +248,64 @@ const Trainers: React.FC = () => {
     );
   };
 
-  // Handle edit trainer action
-  const handleEditTrainer = (trainer: Trainer) => {
-    // Set the trainer being edited
-    setEditingTrainer(trainer);
+  // Add/update trainer function
+  const addOrUpdateTrainer = (trainer: Trainer) => {
+    // Check if trainer already exists
+    const exists = trainers.some((t) => t.id === trainer.id);
 
-    // Convert the trainer data to match TrainerFormData format
-    const formData: TrainerFormData = {
-      name: trainer.name,
-      email: trainer.email,
-      phoneNo: trainer.phoneNo,
-      qualification: trainer.qualification,
-      passingYear:
-        typeof trainer.passingYear === "number"
-          ? trainer.passingYear.toString()
-          : trainer.passingYear,
-      expertise: trainer.expertise,
-      resume: trainer.resume,
-      teachingExperience: trainer.teachingExperience,
-      developmentExperience: trainer.developmentExperience,
-      totalExperience: trainer.totalExperience,
-      feasibleTime: trainer.feasibleTime,
-      payoutExpectation: trainer.payoutExpectation,
-      location: trainer.location,
-      remarks: trainer.remarks,
-      id: trainer.id,
-    };
+    let updatedTrainers: Trainer[];
 
-    // Set the initial form data for the form
-    setInitialFormData(formData);
-    setIsFormOpen(true);
+    if (exists) {
+      // Update existing trainer
+      updatedTrainers = trainers.map((t) =>
+        t.id === trainer.id ? trainer : t
+      );
+    } else {
+      // Add new trainer with ID
+      const trainerWithId = {
+        ...trainer,
+        id: trainer.id || generateUUID(),
+      };
+      updatedTrainers = [...trainers, trainerWithId];
+    }
+
+    // Update state
+    setTrainers(updatedTrainers);
+
+    // Save to localStorage
+    saveTrainersToLocalStorage(updatedTrainers);
+
+    return updatedTrainers;
+  };
+
+  // Handle trashing a trainer
+  const handleTrashTrainer = (trainer: Trainer) => {
+    // Remove from trainers list using ID for reliable identification
+    const updatedTrainers = trainers.filter((t) => t.id !== trainer.id);
+
+    // Update state
+    setTrainers(updatedTrainers);
+
+    // Save updated trainers to localStorage
+    saveTrainersToLocalStorage(updatedTrainers);
+
+    // Add to localStorage for trash
+    const trashedTrainers = JSON.parse(
+      localStorage.getItem("trashedTrainers") || "[]"
+    );
+    trashedTrainers.push({
+      ...trainer,
+      trashedAt: new Date().toISOString(),
+    });
+    localStorage.setItem("trashedTrainers", JSON.stringify(trashedTrainers));
+
+    // Show success message
+    setSuccess(`Trainer "${trainer.name}" has been moved to trash.`);
+
+    // Clear success message after 3 seconds
+    setTimeout(() => {
+      setSuccess(null);
+    }, 3000);
   };
 
   // Handle form submission (for both create and update)
@@ -282,35 +321,28 @@ const Trainers: React.FC = () => {
       // Log the form data being sent
       console.log(`${isEditing ? "Updating" : "Creating"} trainer:`, formData);
 
-      // For now, we'll handle client-side updates since there's no backend
       if (isEditing && editingTrainer) {
-        // Update the trainer in the local state
-        setTrainers((prevTrainers) =>
-          prevTrainers.map((t) => {
-            // Always use ID for matching
-            if (t.id === editingTrainer.id) {
-              // Convert form data back to Trainer format
-              return {
-                ...t,
-                name: formData.name,
-                email: formData.email,
-                phoneNo: formData.phoneNo,
-                qualification: formData.qualification,
-                passingYear: formData.passingYear,
-                expertise: formData.expertise,
-                resume: formData.resume,
-                teachingExperience: formData.teachingExperience,
-                developmentExperience: formData.developmentExperience,
-                totalExperience: formData.totalExperience,
-                feasibleTime: formData.feasibleTime,
-                payoutExpectation: formData.payoutExpectation,
-                location: formData.location,
-                remarks: formData.remarks,
-              };
-            }
-            return t;
-          })
-        );
+        // Update the trainer
+        const updatedTrainer: Trainer = {
+          ...editingTrainer,
+          name: formData.name,
+          email: formData.email,
+          phoneNo: formData.phoneNo,
+          qualification: formData.qualification,
+          passingYear: formData.passingYear,
+          expertise: formData.expertise,
+          resume: formData.resume,
+          teachingExperience: formData.teachingExperience,
+          developmentExperience: formData.developmentExperience,
+          totalExperience: formData.totalExperience,
+          feasibleTime: formData.feasibleTime,
+          payoutExpectation: formData.payoutExpectation,
+          location: formData.location,
+          remarks: formData.remarks,
+          status: formData.status || editingTrainer.status,
+        };
+
+        addOrUpdateTrainer(updatedTrainer);
         setSuccess("Trainer updated successfully!");
       } else {
         // Handle resume for new trainer
@@ -325,9 +357,9 @@ const Trainers: React.FC = () => {
           console.log("Would upload file:", formData.resume.name);
         }
 
-        // Create new trainer with guaranteed ID
+        // Create new trainer
         const newTrainer: Trainer = {
-          id: generateUUID(), // Always generate a new ID
+          id: generateUUID(),
           name: formData.name,
           email: formData.email,
           phoneNo: formData.phoneNo,
@@ -342,9 +374,10 @@ const Trainers: React.FC = () => {
           payoutExpectation: formData.payoutExpectation,
           location: formData.location,
           remarks: formData.remarks,
+          status: formData.status || "Pending",
         };
 
-        setTrainers((prevTrainers) => [...prevTrainers, newTrainer]);
+        addOrUpdateTrainer(newTrainer);
         setSuccess("Trainer added successfully!");
       }
 
@@ -398,28 +431,119 @@ const Trainers: React.FC = () => {
     }
   };
 
-  // Handle trashing a trainer
-  const handleTrashTrainer = (trainer: Trainer) => {
-    // Remove from trainers list using ID for reliable identification
-    setTrainers(trainers.filter((t) => t.id !== trainer.id));
+  // Handle editing a trainer
+  const handleEditTrainer = (trainer: Trainer) => {
+    console.log("Editing trainer:", trainer);
 
-    // Add to localStorage for trash
-    const trashedTrainers = JSON.parse(
-      localStorage.getItem("trashedTrainers") || "[]"
-    );
-    trashedTrainers.push({
-      ...trainer,
-      trashedAt: new Date().toISOString(),
-    });
-    localStorage.setItem("trashedTrainers", JSON.stringify(trashedTrainers));
+    // Check if this is a status update (comparing with the existing trainer)
+    const existingTrainer = trainers.find((t) => t.id === trainer.id);
+    if (existingTrainer && existingTrainer.status !== trainer.status) {
+      // This is just a status update
+      const updatedTrainer = { ...trainer };
+      addOrUpdateTrainer(updatedTrainer);
 
-    // Show success message
-    setSuccess(`Trainer "${trainer.name}" has been moved to trash.`);
+      // If connected to backend API, update there too
+      updateTrainerStatus(trainer.id as string, trainer.status);
+      return;
+    }
 
-    // Clear success message after 3 seconds
-    setTimeout(() => {
-      setSuccess(null);
-    }, 3000);
+    // Otherwise, it's a regular edit action - open the form
+    setEditingTrainer(trainer);
+
+    const formData: TrainerFormData = {
+      id: trainer.id,
+      name: trainer.name,
+      email: trainer.email,
+      phoneNo: trainer.phoneNo,
+      qualification: trainer.qualification,
+      passingYear: trainer.passingYear.toString(),
+      expertise: trainer.expertise,
+      resume: trainer.resume,
+      teachingExperience: trainer.teachingExperience,
+      developmentExperience: trainer.developmentExperience,
+      totalExperience: trainer.totalExperience,
+      feasibleTime: trainer.feasibleTime,
+      payoutExpectation: trainer.payoutExpectation,
+      location: trainer.location,
+      remarks: trainer.remarks,
+      status: trainer.status,
+    };
+
+    // Set the initial form data for the form
+    setInitialFormData(formData);
+    setIsFormOpen(true);
+  };
+
+  // Function to update trainer status via API
+  const updateTrainerStatus = async (
+    trainerId: string,
+    status: "Selected" | "Rejected" | "Pending"
+  ) => {
+    const maxRetries = 3;
+    let retryCount = 0;
+
+    const attemptUpdate = async (): Promise<void> => {
+      try {
+        // Make API call to update status
+        await axios.patch(
+          `${
+            process.env.VITE_API_URL || "http://localhost:5000"
+          }/api/trainers/${trainerId}/status`,
+          {
+            status,
+          }
+        );
+
+        // Show success message
+        setSuccess(`Trainer status updated to ${status} successfully!`);
+
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setSuccess(null);
+        }, 3000);
+
+        return; // Success, exit the function
+      } catch (error) {
+        console.error(`Attempt ${retryCount + 1} failed:`, error);
+
+        // If we have retries left, try again
+        if (retryCount < maxRetries - 1) {
+          retryCount++;
+          // Wait for 1 second before retrying (exponential backoff)
+          await new Promise((resolve) =>
+            setTimeout(resolve, 1000 * Math.pow(2, retryCount))
+          );
+          return attemptUpdate();
+        }
+
+        // If we're out of retries, handle the error
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error occurred";
+        const isNetworkError =
+          error instanceof Error && error.message.includes("network");
+
+        setError(
+          isNetworkError
+            ? `Network error: Unable to update trainer status. Please check your internet connection.`
+            : `Failed to update trainer status: ${errorMessage}`
+        );
+
+        // Clear error message after 5 seconds
+        setTimeout(() => {
+          setError(null);
+        }, 5000);
+
+        // Even if the API call failed, update the local state to maintain UI consistency
+        const updatedTrainers = trainers.map((trainer) =>
+          trainer.id === trainerId ? { ...trainer, status } : trainer
+        );
+        setTrainers(updatedTrainers);
+        saveTrainersToLocalStorage(updatedTrainers);
+      }
+    };
+
+    // Start the update attempt
+    await attemptUpdate();
   };
 
   const toggleSimplifiedView = () => {
@@ -515,6 +639,7 @@ const Trainers: React.FC = () => {
           <option value="">Sort by</option>
           <option value="totalExperience">Total Experience</option>
           <option value="passingYear">Passing Year</option>
+          <option value="status">Status</option>
         </select>
 
         {/* Ascending/Descending Toggle */}
