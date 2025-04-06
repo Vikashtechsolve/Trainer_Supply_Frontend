@@ -32,6 +32,21 @@ interface DeletedCourse {
   description: string;
 }
 
+interface DeletedVendor {
+  name: string;
+  company: string;
+  email: string;
+  phoneNo: string;
+  pastRelationship: string;
+  link: string;
+  contactPersonPosition: string;
+  status: string;
+  trainerSupplied: string[];
+  location: string;
+  id?: string;
+  trashedAt: string;
+}
+
 interface ConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -88,14 +103,17 @@ const Trash: React.FC = () => {
   const [deletedTrainers, setDeletedTrainers] = useState<DeletedTrainer[]>([]);
   const [deletedClients] = useState<DeletedClient[]>([]);
   const [deletedCourses] = useState<DeletedCourse[]>([]);
+  const [deletedVendors, setDeletedVendors] = useState<DeletedVendor[]>([]);
   const [success, setSuccess] = useState<string | null>(null);
   const [confirmationModal, setConfirmationModal] = useState<{
     isOpen: boolean;
     trainer: DeletedTrainer | null;
+    vendor: DeletedVendor | null;
     action: string;
   }>({
     isOpen: false,
     trainer: null,
+    vendor: null,
     action: "",
   });
 
@@ -114,6 +132,11 @@ const Trash: React.FC = () => {
   const [courseItemsPerPage, setCourseItemsPerPage] = useState(10);
   const [paginatedCourses, setPaginatedCourses] = useState<DeletedCourse[]>([]);
 
+  // Vendor pagination states
+  const [vendorCurrentPage, setVendorCurrentPage] = useState(1);
+  const [vendorItemsPerPage, setVendorItemsPerPage] = useState(10);
+  const [paginatedVendors, setPaginatedVendors] = useState<DeletedVendor[]>([]);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -122,6 +145,12 @@ const Trash: React.FC = () => {
       localStorage.getItem("trashedTrainers") || "[]"
     );
     setDeletedTrainers(trashedTrainers);
+
+    // Load trashed vendors from localStorage
+    const trashedVendors = JSON.parse(
+      localStorage.getItem("trashedVendors") || "[]"
+    );
+    setDeletedVendors(trashedVendors);
   }, []);
 
   // Load saved pagination preferences
@@ -148,6 +177,14 @@ const Trash: React.FC = () => {
     );
     if (savedCourseItemsPerPage) {
       setCourseItemsPerPage(Number(savedCourseItemsPerPage));
+    }
+
+    // Load vendor items per page
+    const savedVendorItemsPerPage = localStorage.getItem(
+      "trashVendorItemsPerPage"
+    );
+    if (savedVendorItemsPerPage) {
+      setVendorItemsPerPage(Number(savedVendorItemsPerPage));
     }
   }, []);
 
@@ -181,6 +218,22 @@ const Trash: React.FC = () => {
     setPaginatedCourses(deletedCourses.slice(startIndex, endIndex));
   }, [deletedCourses, courseCurrentPage, courseItemsPerPage]);
 
+  // Calculate pagination for vendors
+  useEffect(() => {
+    const startIndex = (vendorCurrentPage - 1) * vendorItemsPerPage;
+    const endIndex = startIndex + vendorItemsPerPage;
+    setPaginatedVendors(deletedVendors.slice(startIndex, endIndex));
+
+    // Reset to page 1 if current page is invalid
+    if (
+      vendorCurrentPage >
+        Math.ceil(deletedVendors.length / vendorItemsPerPage) &&
+      deletedVendors.length > 0
+    ) {
+      setVendorCurrentPage(1);
+    }
+  }, [deletedVendors, vendorCurrentPage, vendorItemsPerPage]);
+
   // Get total pages
   const trainerTotalPages = Math.max(
     1,
@@ -194,6 +247,10 @@ const Trash: React.FC = () => {
     1,
     Math.ceil(deletedCourses.length / courseItemsPerPage)
   );
+  const vendorTotalPages = Math.max(
+    1,
+    Math.ceil(deletedVendors.length / vendorItemsPerPage)
+  );
 
   const toggleSection = (section: string) => {
     setActiveSection(activeSection === section ? null : section);
@@ -203,6 +260,7 @@ const Trash: React.FC = () => {
     setConfirmationModal({
       isOpen: true,
       trainer: trainer,
+      vendor: null,
       action: "Restore",
     });
   };
@@ -265,6 +323,68 @@ const Trash: React.FC = () => {
     setCourseItemsPerPage(newValue);
     setCourseCurrentPage(1);
     localStorage.setItem("trashCourseItemsPerPage", newValue.toString());
+  };
+
+  const openRestoreVendorConfirmation = (vendor: DeletedVendor) => {
+    setConfirmationModal({
+      isOpen: true,
+      trainer: null,
+      vendor: vendor,
+      action: "Restore",
+    });
+  };
+
+  const handleRestoreVendor = () => {
+    if (!confirmationModal.vendor) return;
+
+    const vendor = confirmationModal.vendor;
+
+    // Remove from trashed vendors using ID for reliable identification
+    const updatedTrashedVendors = deletedVendors.filter(
+      (v) => v.id !== vendor.id
+    );
+
+    setDeletedVendors(updatedTrashedVendors);
+    localStorage.setItem(
+      "trashedVendors",
+      JSON.stringify(updatedTrashedVendors)
+    );
+
+    // Get current vendors from localStorage or initialize empty array
+    const currentVendors = JSON.parse(localStorage.getItem("vendors") || "[]");
+
+    // Add the vendor back to active vendors (without the trashedAt property)
+    const { trashedAt, ...vendorData } = vendor;
+
+    // Ensure the vendor has an ID
+    if (!vendorData.id) {
+      vendorData.id = "restored-" + new Date().getTime();
+    }
+
+    currentVendors.push(vendorData);
+    localStorage.setItem("vendors", JSON.stringify(currentVendors));
+
+    // Show success message
+    setSuccess(`Vendor "${vendor.name}" has been restored.`);
+
+    // Clear success message after 3 seconds
+    setTimeout(() => {
+      setSuccess(null);
+    }, 3000);
+  };
+
+  const handleVendorItemsPerPageChange = (newValue: number) => {
+    setVendorItemsPerPage(newValue);
+    setVendorCurrentPage(1);
+    localStorage.setItem("trashVendorItemsPerPage", newValue.toString());
+  };
+
+  const handleConfirmAction = () => {
+    if (confirmationModal.trainer) {
+      handleRestoreTrainer();
+    } else if (confirmationModal.vendor) {
+      handleRestoreVendor();
+    }
   };
 
   return (
@@ -347,6 +467,84 @@ const Trash: React.FC = () => {
                 itemsPerPage={trainerItemsPerPage}
                 onItemsPerPageChange={handleTrainerItemsPerPageChange}
                 totalItems={deletedTrainers.length}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Vendors Section */}
+        <div
+          onClick={() => toggleSection("vendors")}
+          className="cursor-pointer p-4 hover:bg-gray-50 rounded-lg border"
+        >
+          <h2 className="text-lg font-semibold">View removed Vendors</h2>
+          {deletedVendors.length > 0 && (
+            <span className="ml-2 px-2 py-1 bg-gray-200 text-gray-700 rounded-full text-xs">
+              {deletedVendors.length}
+            </span>
+          )}
+        </div>
+
+        {activeSection === "vendors" && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-sm text-left text-gray-500 border-b border-gray-100">
+                    <th className="px-6 py-3 font-medium">Name</th>
+                    <th className="px-6 py-3 font-medium">Company</th>
+                    <th className="px-6 py-3 font-medium">Email</th>
+                    <th className="px-6 py-3 font-medium">Location</th>
+                    <th className="px-6 py-3 font-medium">Trashed At</th>
+                    <th className="px-6 py-3 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedVendors.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-6 py-4 text-center text-gray-500"
+                      >
+                        No vendors in trash
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedVendors.map((vendor, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4">{vendor.name}</td>
+                        <td className="px-6 py-4">{vendor.company}</td>
+                        <td className="px-6 py-4">{vendor.email}</td>
+                        <td className="px-6 py-4">{vendor.location}</td>
+                        <td className="px-6 py-4">
+                          {new Date(vendor.trashedAt).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() =>
+                              openRestoreVendorConfirmation(vendor)
+                            }
+                            className="text-blue-500 hover:text-blue-700 mr-2"
+                          >
+                            Restore
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Add pagination for vendors */}
+            {deletedVendors.length > 0 && (
+              <Pagination
+                currentPage={vendorCurrentPage}
+                totalPages={vendorTotalPages}
+                onPageChange={setVendorCurrentPage}
+                itemsPerPage={vendorItemsPerPage}
+                onItemsPerPageChange={handleVendorItemsPerPageChange}
+                totalItems={deletedVendors.length}
               />
             )}
           </div>
@@ -478,8 +676,12 @@ const Trash: React.FC = () => {
         onClose={() =>
           setConfirmationModal((prev) => ({ ...prev, isOpen: false }))
         }
-        onConfirm={handleRestoreTrainer}
-        itemName={confirmationModal.trainer?.name || ""}
+        onConfirm={handleConfirmAction}
+        itemName={
+          confirmationModal.trainer?.name ||
+          confirmationModal.vendor?.name ||
+          ""
+        }
         action={confirmationModal.action}
       />
     </div>

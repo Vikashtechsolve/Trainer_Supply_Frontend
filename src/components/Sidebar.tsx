@@ -9,6 +9,7 @@ import {
   BarChart2,
   Settings,
   Trash2,
+  Store,
 } from "lucide-react";
 
 type NavItemProps = {
@@ -62,6 +63,12 @@ const Sidebar: React.FC = () => {
           label="Clients"
           href="/clients"
           active={currentPath === "/clients"}
+        />
+        <NavItem
+          icon={Store}
+          label="Vendors"
+          href="/vendors"
+          active={currentPath === "/vendors"}
         />
         <NavItem
           icon={Calendar}

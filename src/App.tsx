@@ -13,6 +13,7 @@ import Payments from "./pages/Payments";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import Vendors from "./pages/Vendors";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
             <Route index element={<Dashboard />} />
             <Route path="trainers" element={<Trainers />} />
             <Route path="clients" element={<Clients />} />
+            <Route path="vendors" element={<Vendors />} />
             <Route path="trash" element={<Trash />} />
             <Route path="schedule" element={<Schedule />} />
             <Route path="payments" element={<Payments />} />
