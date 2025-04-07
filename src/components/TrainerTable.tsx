@@ -1,5 +1,4 @@
-import React from "react";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Pagination from "./Pagination";
 import { MoreVertical } from "lucide-react";
 import StatusBadge from "./StatusBadge";
@@ -213,20 +212,51 @@ const TrainersTable: React.FC<TrainerTableProps> = ({
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [paginatedTrainers, setPaginatedTrainers] = useState<Trainers[]>([]);
 
-  // Calculate pagination whenever trainers or pagination settings change
+  // Track previous values with refs to avoid unnecessary updates
+  const prevTrainersLengthRef = useRef<number>(Trainers.length);
+  const isInitialMount = useRef(true);
+
+  // Load saved preference for items per page - only run once on component mount
+  useEffect(() => {
+    const savedItemsPerPage = localStorage.getItem("trainerTableItemsPerPage");
+    if (savedItemsPerPage) {
+      const parsedValue = Number(savedItemsPerPage);
+      if (!isNaN(parsedValue) && parsedValue > 0) {
+        setItemsPerPage(parsedValue);
+      }
+    }
+  }, []); // Empty dependency array ensures this only runs once on mount
+
+  // Update paginated trainers whenever necessary inputs change
   useEffect(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     setPaginatedTrainers(Trainers.slice(startIndex, endIndex));
-
-    // If current page is now invalid, reset to page 1
-    if (
-      currentPage > Math.ceil(Trainers.length / itemsPerPage) &&
-      Trainers.length > 0
-    ) {
-      setCurrentPage(1);
-    }
   }, [Trainers, currentPage, itemsPerPage]);
+
+  // Handle page validation separately to avoid loops
+  useEffect(() => {
+    // Skip on initial mount since we already set default values
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    // Only run this effect when Trainers.length changes
+    if (prevTrainersLengthRef.current !== Trainers.length) {
+      // Update the ref to current length
+      prevTrainersLengthRef.current = Trainers.length;
+
+      // Calculate max page
+      const maxPage = Math.max(1, Math.ceil(Trainers.length / itemsPerPage));
+
+      // Check if current page is now invalid
+      if (Trainers.length > 0 && currentPage > maxPage) {
+        // Reset to page 1
+        setCurrentPage(1);
+      }
+    }
+  }, [Trainers.length, itemsPerPage]); // Deliberately exclude currentPage to prevent cycles
 
   // Get total pages
   const totalPages = Math.max(1, Math.ceil(Trainers.length / itemsPerPage));
@@ -247,14 +277,6 @@ const TrainersTable: React.FC<TrainerTableProps> = ({
       newItemsPerPage.toString()
     );
   };
-
-  // Load saved preference for items per page
-  useEffect(() => {
-    const savedItemsPerPage = localStorage.getItem("trainerTableItemsPerPage");
-    if (savedItemsPerPage) {
-      setItemsPerPage(Number(savedItemsPerPage));
-    }
-  }, []);
 
   const toggleDropdown = (index: number) => {
     if (openDropdown === index) {
@@ -405,11 +427,12 @@ const TrainersTable: React.FC<TrainerTableProps> = ({
                       status={trainer.status || "Pending"}
                       clickable={true}
                       onClick={(newStatus) => {
-                        const updatedTrainer = {
-                          ...trainer,
-                          status: newStatus,
-                        };
                         if (onEditTrainer) {
+                          // Create a new object rather than mutating the original
+                          const updatedTrainer = {
+                            ...trainer,
+                            status: newStatus,
+                          };
                           onEditTrainer(updatedTrainer);
                         }
                       }}

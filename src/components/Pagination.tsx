@@ -107,7 +107,7 @@ const Pagination: React.FC<PaginationProps> = ({
         </button>
 
         {getPageNumbers().map((page, index) => (
-          <React.Fragment key={index}>
+          <span key={index}>
             {page === -1 || page === -2 ? (
               <span className="px-2 py-1 text-sm text-gray-700">...</span>
             ) : (
@@ -122,7 +122,7 @@ const Pagination: React.FC<PaginationProps> = ({
                 {page}
               </button>
             )}
-          </React.Fragment>
+          </span>
         ))}
 
         <button

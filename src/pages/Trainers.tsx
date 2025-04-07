@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Plus } from "lucide-react";
 import ActionCard from "../components/ActionCard";
 import TrainerForm, { TrainerFormData } from "../components/TrainerForm";
@@ -7,6 +7,7 @@ import TrainerTable from "../components/TrainerTable";
 import { useNavigate } from "react-router-dom";
 import Pagination from "../components/Pagination";
 import StatusBadge from "../components/StatusBadge";
+import { logger } from "../utils/logger";
 
 interface APIErrorResponse {
   errors: { msg: string }[];
@@ -62,6 +63,10 @@ const Trainers: React.FC = () => {
   const [paginatedTrainers, setPaginatedTrainers] = useState<Trainer[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Use ref to track previous values
+  const prevSortedTrainersLengthRef = useRef<number>(0);
+  const isInitialMount = useRef(true);
 
   const filterOptions = [
     "name",
@@ -131,7 +136,7 @@ const Trainers: React.FC = () => {
       try {
         setTrainers(JSON.parse(storedTrainers));
       } catch (error) {
-        console.error("Failed to parse trainers from localStorage:", error);
+        // Remove console.error statement
       }
     }
   }, []); // Empty dependency array is correct here as we only want to load on mount
@@ -143,10 +148,7 @@ const Trainers: React.FC = () => {
       try {
         setSimplifiedView(JSON.parse(savedSimplifiedView));
       } catch (error) {
-        console.error(
-          "Failed to parse simplifiedView from localStorage:",
-          error
-        );
+        // Remove console.error statement
       }
     }
   }, []);
@@ -170,7 +172,7 @@ const Trainers: React.FC = () => {
         setTrainers(trainersWithIds);
       }
     } catch (error) {
-      console.error("Failed to save trainers to localStorage:", error);
+      // Remove console.error statement
     }
   };
 
@@ -215,15 +217,29 @@ const Trainers: React.FC = () => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     setPaginatedTrainers(sortedTrainers.slice(startIndex, endIndex));
-
-    // If current page is now invalid, reset to page 1
-    if (
-      currentPage > Math.ceil(sortedTrainers.length / itemsPerPage) &&
-      sortedTrainers.length > 0
-    ) {
-      setCurrentPage(1);
-    }
   }, [sortedTrainers, currentPage, itemsPerPage]);
+
+  // Separate useEffect to check for invalid pages
+  useEffect(() => {
+    // Skip on initial mount since we already set default values
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    // Only run when length changes to avoid infinite loops
+    if (prevSortedTrainersLengthRef.current !== sortedTrainers.length) {
+      prevSortedTrainersLengthRef.current = sortedTrainers.length;
+
+      const maxPage = Math.max(
+        1,
+        Math.ceil(sortedTrainers.length / itemsPerPage)
+      );
+      if (sortedTrainers.length > 0 && currentPage > maxPage) {
+        setCurrentPage(1);
+      }
+    }
+  }, [sortedTrainers.length, itemsPerPage]); // Deliberately exclude currentPage to prevent cycles
 
   // Get total pages
   const totalPages = Math.max(
@@ -250,32 +266,23 @@ const Trainers: React.FC = () => {
 
   // Add/update trainer function
   const addOrUpdateTrainer = (trainer: Trainer) => {
-    // Check if trainer already exists
-    const exists = trainers.some((t) => t.id === trainer.id);
+    try {
+      const updatedTrainers = [...trainers];
+      const index = updatedTrainers.findIndex((t) => t.id === trainer.id);
 
-    let updatedTrainers: Trainer[];
+      if (index !== -1) {
+        // Update existing trainer
+        updatedTrainers[index] = trainer;
+      } else {
+        // Add new trainer
+        updatedTrainers.push(trainer);
+      }
 
-    if (exists) {
-      // Update existing trainer
-      updatedTrainers = trainers.map((t) =>
-        t.id === trainer.id ? trainer : t
-      );
-    } else {
-      // Add new trainer with ID
-      const trainerWithId = {
-        ...trainer,
-        id: trainer.id || generateUUID(),
-      };
-      updatedTrainers = [...trainers, trainerWithId];
+      setTrainers(updatedTrainers);
+      saveTrainersToLocalStorage(updatedTrainers);
+    } catch (error) {
+      logger.error("Error updating trainer:", error);
     }
-
-    // Update state
-    setTrainers(updatedTrainers);
-
-    // Save to localStorage
-    saveTrainersToLocalStorage(updatedTrainers);
-
-    return updatedTrainers;
   };
 
   // Handle trashing a trainer
@@ -318,9 +325,6 @@ const Trainers: React.FC = () => {
       // Check if we're editing an existing trainer
       const isEditing = !!editingTrainer;
 
-      // Log the form data being sent
-      console.log(`${isEditing ? "Updating" : "Creating"} trainer:`, formData);
-
       if (isEditing && editingTrainer) {
         // Update the trainer
         const updatedTrainer: Trainer = {
@@ -354,7 +358,6 @@ const Trainers: React.FC = () => {
             /\s+/g,
             "-"
           )}.pdf`;
-          console.log("Would upload file:", formData.resume.name);
         }
 
         // Create new trainer
@@ -386,13 +389,6 @@ const Trainers: React.FC = () => {
       setEditingTrainer(null);
       setInitialFormData(undefined);
     } catch (err: unknown) {
-      console.error("Error details:", {
-        message: err instanceof Error ? err.message : String(err),
-        response: (err as { response?: { data?: unknown; status?: number } })
-          ?.response?.data,
-        status: (err as { response?: { status?: number } })?.response?.status,
-      });
-
       let errorMessage = `Failed to ${
         editingTrainer ? "update" : "add"
       } trainer. Please try again.`;
@@ -433,16 +429,23 @@ const Trainers: React.FC = () => {
 
   // Handle editing a trainer
   const handleEditTrainer = (trainer: Trainer) => {
-    console.log("Editing trainer:", trainer);
-
     // Check if this is a status update (comparing with the existing trainer)
     const existingTrainer = trainers.find((t) => t.id === trainer.id);
     if (existingTrainer && existingTrainer.status !== trainer.status) {
       // This is just a status update
       const updatedTrainer = { ...trainer };
-      addOrUpdateTrainer(updatedTrainer);
+
+      // Update the local state only once
+      const updatedTrainers = trainers.map((t) =>
+        t.id === trainer.id ? updatedTrainer : t
+      );
+      setTrainers(updatedTrainers);
+
+      // Save to localStorage
+      saveTrainersToLocalStorage(updatedTrainers);
 
       // If connected to backend API, update there too
+      // Don't call addOrUpdateTrainer which would trigger another state update
       updateTrainerStatus(trainer.id as string, trainer.status);
       return;
     }
@@ -504,8 +507,7 @@ const Trainers: React.FC = () => {
 
         return; // Success, exit the function
       } catch (error) {
-        console.error(`Attempt ${retryCount + 1} failed:`, error);
-
+        logger.error("Error updating trainer status:", error);
         // If we have retries left, try again
         if (retryCount < maxRetries - 1) {
           retryCount++;

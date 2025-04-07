@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import Pagination from "../components/Pagination";
 import StatusBadge from "../components/StatusBadge";
 import VendorForm, { VendorFormData } from "../components/VendorForm";
+import { logger } from "../utils/logger";
 
 interface APIErrorResponse {
   errors: { msg: string }[];
@@ -84,7 +85,7 @@ const Vendors: React.FC = () => {
       try {
         setVendors(JSON.parse(storedVendors));
       } catch (error) {
-        console.error("Failed to parse vendors from localStorage:", error);
+        // Remove console.error statement
       }
     }
   }, []);
@@ -96,10 +97,7 @@ const Vendors: React.FC = () => {
       try {
         setSimplifiedView(JSON.parse(savedSimplifiedView));
       } catch (error) {
-        console.error(
-          "Failed to parse simplifiedView from localStorage:",
-          error
-        );
+        // Remove console.error statement
       }
     }
   }, []);
@@ -123,7 +121,7 @@ const Vendors: React.FC = () => {
         setVendors(vendorsWithIds);
       }
     } catch (error) {
-      console.error("Failed to save vendors to localStorage:", error);
+      // Remove console.error statement
     }
   };
 
@@ -259,7 +257,6 @@ const Vendors: React.FC = () => {
       } else {
         setError("An unexpected error occurred. Please try again.");
       }
-      console.error("Error submitting vendor data:", err);
     } finally {
       setIsSubmitting(false);
     }
@@ -301,7 +298,6 @@ const Vendors: React.FC = () => {
         setSuccess(`Vendor status updated to ${status}`);
       }
     } catch (err) {
-      console.error("Error updating vendor status:", err);
       setError("Failed to update vendor status. Please try again.");
     } finally {
       setIsSubmitting(false);
