@@ -79,7 +79,7 @@ const LoginForm = ({ onSuccess }: LoginFormProps) => {
     try {
       const normalizedEmail = formData.email.toLowerCase().trim();
 
-      const { data } = await axiosInstance.post("/api/users/login", {
+      const { data } = await axiosInstance.post("/api/auth/login", {
         email: normalizedEmail,
         password: formData.password,
       });
