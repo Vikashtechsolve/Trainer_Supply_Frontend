@@ -58,42 +58,21 @@ const Sidebar: React.FC = () => {
           href="/trainers"
           active={currentPath === "/trainers"}
         />
-        <NavItem
-          icon={Users}
-          label="Clients"
-          href="/clients"
-          active={currentPath === "/clients"}
-        />
+
         <NavItem
           icon={Store}
           label="Vendors"
           href="/vendors"
           active={currentPath === "/vendors"}
         />
-        <NavItem
-          icon={Calendar}
-          label="Schedule"
-          href="/schedule"
-          active={currentPath === "/schedule"}
-        />
+
         <NavItem
           icon={Trash2}
           label="Trash"
           href="/trash"
           active={currentPath === "/trash"}
         />
-        <NavItem
-          icon={CreditCard}
-          label="Payments"
-          href="/payments"
-          active={currentPath === "/payments"}
-        />
-        <NavItem
-          icon={BarChart2}
-          label="Reports"
-          href="/reports"
-          active={currentPath === "/reports"}
-        />
+
         <NavItem
           icon={Settings}
           label="Settings"
